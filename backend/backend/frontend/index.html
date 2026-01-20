@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>EcoLife AI Dashboard</title>
+<meta name="viewport" content="width=device-width">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+body{font-family:Arial;background:#f4f7f6;padding:20px}
+.card{background:#fff;padding:20px;border-radius:12px;margin-bottom:20px}
+button{padding:10px;background:#2e7d32;color:#fff;border:none;border-radius:6px}
+</style>
+</head>
+
+<body>
+
+<h1>🌍 EcoLife AI</h1>
+
+<div id="login"></div>
+
+<div id="app" style="display:none">
+  <div class="card">
+    <input id="carbon" placeholder="Carbon kg/day">
+    <input id="water" placeholder="Water liters/day">
+    <input id="energy" placeholder="Energy kWh/day">
+    <button onclick="save()">Calculate & Save</button>
+    <div id="score"></div>
+  </div>
+
+  <div class="card">
+    <canvas id="chart"></canvas>
+  </div>
+
+  <div class="card">
+    <input id="q" placeholder="Ask EcoLife AI">
+    <button onclick="ask()">Ask</button>
+    <div id="a"></div>
+  </div>
+</div>
+
+<script>
+let email="";
+let chart;
+
+google.accounts.id.initialize({
+  client_id:"PASTE_GOOGLE_CLIENT_ID",
+  callback:(res)=>{
+    email = JSON.parse(atob(res.credential.split(".")[1])).email;
+    document.getElementById("app").style.display="block";
+  }
+});
+google.accounts.id.renderButton(
+  document.getElementById("login"),
+  { theme:"outline", size:"large" }
+);
+
+function save(){
+  const c=+carbon.value,w=+water.value,e=+energy.value;
+  const score=Math.max(0,100-(c*10)-(w/10)-(e*5));
+  scoreDiv.innerHTML="Eco Score: "+score;
+
+  fetch("http://localhost:3000/save",{
+    method:"POST",
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({email,carbon:c,water:w,energy:e,score})
+  }).then(loadHistory);
+}
+
+function loadHistory(){
+  fetch("http://localhost:3000/history/"+email)
+  .then(r=>r.json())
+  .then(data=>{
+    const labels=data.map(d=>d.date);
+    const scores=data.map(d=>d.score);
+    if(chart) chart.destroy();
+    chart=new Chart(chartEl,{
+      type:'line',
+      data:{labels,datasets:[{label:"Eco Score",data:scores}]}
+    });
+  });
+}
+
+function ask(){
+  fetch("http://localhost:3000/ai",{
+    method:"POST",
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({message:q.value})
+  }).then(r=>r.json()).then(d=>a.innerText=d.reply);
+}
+
+const scoreDiv=document.getElementById("score");
+const chartEl=document.getElementById("chart");
+</script>
+</body>
+</html>
